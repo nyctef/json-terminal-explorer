@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Spectre.Console;
 
 namespace json_terminal_explorer
 {
@@ -20,12 +21,12 @@ namespace json_terminal_explorer
             {
                 var filename = Path.GetFullPath(args[0]);
                 var json = JsonDocument.Parse(File.OpenRead(filename), JsonDocumentOptions());
-                Console.WriteLine(JsonDocToString(json));
+                PrettyPrintJson(json);
             }
             else
             {
                 var json = JsonDocument.Parse(Console.OpenStandardInput(), JsonDocumentOptions());
-                Console.WriteLine(JsonDocToString(json));
+                PrettyPrintJson(json);
             }
 
             return 0;
@@ -37,17 +38,39 @@ namespace json_terminal_explorer
             CommentHandling = JsonCommentHandling.Skip,
         };
 
-        private static string JsonDocToString(JsonDocument doc)
+        private static void PrettyPrintJson(JsonDocument doc)
         {
-            using var stream = new MemoryStream();
-            var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
+            var root = new Tree("{}");
+            foreach (var property in doc.RootElement.EnumerateObject())
             {
-                Indented = true,
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            });
-            doc.WriteTo(writer);
-            writer.Flush();
-            return Encoding.UTF8.GetString(stream.ToArray());
+                CreateNodeForProperty(root.AddNode, property.Name, property.Value);
+            }
+            AnsiConsole.Render(root);
+        }
+
+        private static void CreateNodeForProperty(Func<string, TreeNode> addNode, string name, JsonElement value)
+        {
+            switch (value.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var objectNode = addNode(name.EscapeMarkup());
+                    foreach (var subProperty in value.EnumerateObject())
+                    {
+                        CreateNodeForProperty(objectNode.AddNode, subProperty.Name, subProperty.Value);
+                    }
+                    break;
+                case JsonValueKind.Array:
+                    var arrayNode = addNode(name.EscapeMarkup());
+                    var i = 0;
+                    foreach (var subProperty in value.EnumerateArray())
+                    {
+                        CreateNodeForProperty(arrayNode.AddNode, i++.ToString(), subProperty);
+                    }
+                    break;
+                default:
+                    addNode($"{name}: {value}".EscapeMarkup());
+                    break;
+            }
         }
 
         private static bool CanReadFromStdin()
