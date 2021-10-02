@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AssemblyName>jte</AssemblyName>
     <TargetFramework>net5.0</TargetFramework>
     <RootNamespace>json_terminal_explorer</RootNamespace>
   </PropertyGroup>
